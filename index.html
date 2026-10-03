@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Личный бюджет — планировщик месяца</title>
+<meta name="description" content="Планировщик личного бюджета: доходы, лимиты категорий, разовые траты, накопления, кредиты и долги, статистика года. Данные хранятся в браузере.">
+<meta name="theme-color" content="#0b0d10">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='8' fill='%230b0d10'/><rect x='4.5' y='4.5' width='55' height='55' rx='5' fill='none' stroke='%23c9a86a' stroke-width='2'/><text x='32' y='44' font-family='Georgia,serif' font-size='34' fill='%23c9a86a' text-anchor='middle'>₽</text></svg>">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">₽</div>
+      <div>
+        <h1>Личный бюджет</h1>
+        <p>Планирование расходов и финансовая дисциплина · <span id="today-label"></span></p>
+      </div>
+    </div>
+
+    <div class="top-controls">
+      <span id="save-flag">сохранено</span>
+      <select id="month-select" aria-label="Месяц"></select>
+      <input id="year-input" class="field" type="number" min="1970" max="2100" style="width:92px" aria-label="Год">
+      <select id="day-select" aria-label="Текущий день месяца"></select>
+      <button class="btn btn-sm btn-ghost" id="today-btn" title="Вернуться к сегодняшнему дню">Сегодня</button>
+      <select id="currency-select" aria-label="Валюта" title="Валюта">
+        <option value="₽">₽ рубль</option>
+        <option value="€">€ евро</option>
+        <option value="$">$ доллар</option>
+        <option value="₸">₸ тенге</option>
+        <option value="Br">Br бел. рубль</option>
+        <option value="₴">₴ гривна</option>
+      </select>
+    </div>
+  </header>
+
+  <section class="card quote-card" aria-live="polite">
+    <div class="quote-mark" aria-hidden="true">“</div>
+    <p class="quote-text" id="quote-text"></p>
+    <div class="quote-meta">
+      <strong id="quote-author"></strong>
+      <span class="muted" id="quote-role"></span>
+      <span class="muted quote-date" id="quote-date"></span>
+    </div>
+    <button class="btn btn-sm btn-ghost" id="quote-next" title="Показать другой принцип (подборка обновляется ежедневно)">Другой принцип</button>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Разделы">
+    <button class="tab is-active" data-tab="plan" data-ico="grid" role="tab" aria-selected="true">Планер</button>
+    <button class="tab" data-tab="debts" data-ico="card" role="tab" aria-selected="false">Кредиты и долги <span class="tab-badge" id="debts-badge" hidden></span></button>
+    <button class="tab" data-tab="stats" data-ico="bars" role="tab" aria-selected="false">Статистика года</button>
+  </nav>
+
+  <!-- ================= ПЛАНЕР ================= -->
+  <section id="pane-plan" role="tabpanel">
+    <section class="summary">
+      <div class="card stat">
+        <div class="label">Доход за месяц</div>
+        <div class="value" id="sum-income">0 ₽</div>
+        <div class="sub">все источники вместе</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Запланировано</div>
+        <div class="value" id="sum-planned">0 ₽</div>
+        <div class="sub">лимиты категорий + разовые траты</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Уже потрачено</div>
+        <div class="value" id="sum-spent">0 ₽</div>
+        <div class="sub">факт по категориям</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Остаток</div>
+        <div class="value" id="sum-balance">0 ₽</div>
+        <div class="sub">доход − план − разовые траты</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Свободно после копилки</div>
+        <div class="value" id="sum-free">0 ₽</div>
+        <div class="sub">остаток − цель накоплений</div>
+      </div>
+      <div class="card stat hero">
+        <div class="label">Бюджет на день</div>
+        <div class="value" id="sum-daily">0 ₽</div>
+        <div class="sub" id="days-left-note"></div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="stack">
+
+        <section class="card">
+          <h2 data-ico="banknote">Доходы</h2>
+          <p class="hint">Зарплата, фриланс, кэшбэк, подработки — всё, что придёт за месяц.</p>
+          <div class="rows" id="income-list"></div>
+          <div class="foot-actions">
+            <button class="btn btn-sm" id="add-income">+ Источник дохода</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 data-ico="list">Категории расходов</h2>
+          <p class="hint">Лимит — сколько выделяете на месяц. Потрачено — сколько уже ушло: прогресс справа считается по нему.</p>
+          <div class="rows-head">
+            <span></span><span>Категория</span><span style="text-align:right">Лимит</span><span style="text-align:right">Потрачено</span><span></span>
+          </div>
+          <div class="rows" id="cat-list"></div>
+          <div class="foot-actions">
+            <button class="btn btn-sm btn-primary" id="add-cat">+ Категория</button>
+            <div class="preset-wrap">
+              <button class="btn btn-sm" id="preset-toggle">Готовые категории</button>
+              <div class="preset-menu" id="preset-menu"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 data-ico="tag">Разовые траты</h2>
+          <p class="hint">Крупные покупки именно этого месяца: техника, ремонт, страховка, билеты.</p>
+          <div class="rows" id="onetime-list"></div>
+          <div class="foot-actions">
+            <button class="btn btn-sm" id="add-onetime">+ Разовая трата</button>
+          </div>
+        </section>
+
+      </div>
+
+      <div class="stack">
+
+        <section class="card">
+          <h2 data-ico="compass">Советник</h2>
+          <p class="hint">Автоматические рекомендации: где сократить расходы и куда направить средства.</p>
+          <div id="advice-box"></div>
+        </section>
+
+        <section class="card">
+          <h2 data-ico="safe">Накопления</h2>
+          <p class="hint">Цель месяца и сколько уже отложено — вычитается из свободных денег до расчёта «на день».</p>
+          <div class="savings-row">
+            <div class="savings-field">
+              <label for="savings-goal-input">Цель на месяц</label>
+              <input id="savings-goal-input" type="text" inputmode="decimal" placeholder="0">
+            </div>
+            <div class="savings-field">
+              <label for="savings-saved-input">Уже отложено</label>
+              <input id="savings-saved-input" type="text" inputmode="decimal" placeholder="0">
+            </div>
+          </div>
+          <div class="bar-track"><div class="bar-fill s-ok" id="savings-bar-fill" style="width:0%"></div></div>
+          <div id="savings-label">Задайте цель — например, 10% дохода</div>
+          <div id="savings-suggest"></div>
+          <div class="foot-actions">
+            <button class="btn btn-sm" id="savings-10">Цель = 10% дохода</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 data-ico="gauge">Прогресс по категориям</h2>
+          <p class="hint">Янтарный — близко к лимиту, терракотовый — перерасход.</p>
+          <div id="cat-progress"></div>
+        </section>
+
+        <section class="card">
+          <h2 data-ico="calendar">Бюджет по дням</h2>
+          <p class="hint" id="calendar-note"></p>
+          <div class="cal-grid" id="calendar"></div>
+        </section>
+
+        <section class="card">
+          <h2 data-ico="diamond">Что это значит</h2>
+          <div id="insights"></div>
+        </section>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= КРЕДИТЫ И ДОЛГИ ================= -->
+  <section id="pane-debts" role="tabpanel" hidden>
+    <div class="grid">
+      <div class="stack">
+
+        <section class="card">
+          <h2 data-ico="card">Мои долги</h2>
+          <p class="hint">Остаток, ставка и минимальный платёж по каждому долгу. Всё считается автоматически.</p>
+          <div class="debt-list" id="debt-list"></div>
+          <div class="foot-actions">
+            <button class="btn btn-sm btn-primary" id="add-debt">+ Долг</button>
+            <span class="muted small" id="debt-empty-hint">Долгов нет — и это сильный показатель.</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 data-ico="trend">Симулятор досрочного погашения</h2>
+          <p class="hint">Сколько месяцев и процентов «съест» долг при разных стратегиях, если добавлять сверху фиксированную сумму.</p>
+          <div class="savings-field" style="max-width:260px">
+            <label for="extra-input">Сверху на долги в месяц</label>
+            <input id="extra-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="sim-grid">
+            <div class="sim-card" id="sim-avalanche">
+              <div class="sim-title" data-ico="avalanche">Лавина</div>
+              <div class="sim-sub">сначала дорогой процент</div>
+              <div class="sim-months" id="sim-av-months">—</div>
+              <div class="sim-interest" id="sim-av-interest"></div>
+              <div class="sim-order" id="sim-av-order"></div>
+            </div>
+            <div class="sim-card" id="sim-snowball">
+              <div class="sim-title" data-ico="snowball">Снежный ком</div>
+              <div class="sim-sub">сначала маленький долг</div>
+              <div class="sim-months" id="sim-sn-months">—</div>
+              <div class="sim-interest" id="sim-sn-interest"></div>
+              <div class="sim-order" id="sim-sn-order"></div>
+            </div>
+          </div>
+          <p class="sim-verdict small muted" id="sim-verdict"></p>
+        </section>
+
+      </div>
+
+      <div class="stack">
+
+        <section class="card">
+          <h2 data-ico="sigma">Сводка по долгам</h2>
+          <div class="debt-summary">
+            <div class="stat-mini"><span class="label">Всего должно</span><span class="value" id="debt-total">0 ₽</span></div>
+            <div class="stat-mini"><span class="label">Платежи в месяц</span><span class="value" id="debt-monthly">0 ₽</span></div>
+            <div class="stat-mini"><span class="label">Нагрузка на доход</span><span class="value" id="debt-dti">—</span></div>
+          </div>
+          <div id="debt-notes"></div>
+        </section>
+
+        <section class="card">
+          <h2 data-ico="book">Памятка: как закрывать кредиты</h2>
+          <details class="memo" open>
+            <summary>11 правил без паники</summary>
+            <ol>
+              <li><strong>Выпишите все долги</strong>: остаток, ставка, минимальный платеж. Решения принимаются по полной картине, а не по тревоге.</li>
+              <li><strong>Сначала — самые дорогие деньги</strong>: кредитки, микрозаймы и POS-кредиты обычно несут наибольшую ставку, их гасите в первую очередь.</li>
+              <li><strong>Выберите стратегию</strong>: «лавина» (сначала высокая ставка) математически минимизирует переплату; «снежный ком» (сначала маленький долг) легче психологически — маленькие победы мотивируют.</li>
+              <li><strong>Платите больше минимального</strong>: даже +3–5 тыс. ₽ в месяц резко сокращают срок и переплату. Платежи «по минималке» по кредитке растягиваются на годы.</li>
+              <li><strong>Кредитка — не бесплатные деньги</strong>: снимайте наличные и переводы с карты только в крайнем случае — за них обычно берут комиссию и отменяют льготный период. Гасите карту полностью до конца грейс-периода.</li>
+              <li><strong>Рефинансируйте</strong>: если есть предложение от банка с более низкой ставкой, объедините дорогие кредиты в один — переплата упадет.</li>
+              <li><strong>Навязанные услуги возвращайте</strong>: от страховки и сервисов по кредиту можно отказаться в «период охлаждения» (14 дней).</li>
+              <li><strong>Не берите новое, чтобы платить старое</strong>: микрозайм «до зарплаты» поверх кредита — это лавина наоборот, только снежная на вашу голову.</li>
+              <li><strong>Держите мини-резерв</strong>: хотя бы один месяц расходов вне кредита, чтобы случайность не заводила вас в новый долг.</li>
+              <li><strong>Стало тяжело — идите в банк до просрочки</strong>: реструктуризация и кредитные каникулы доступны до того, как испорчена история.</li>
+              <li><strong>Закрыли долг — закройте формально</strong>: возьмите справку о полном погашении и проверьте, что кредитор обновил данные в кредитной истории.</li>
+            </ol>
+            <p class="memo-sources small muted">По материалам: [1] finance.mail.ru, [2] Т-Ж, [3] «Московская газета», [4] Сберометр, [5] Keepsoft.</p>
+          </details>
+        </section>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= СТАТИСТИКА ================= -->
+  <section id="pane-stats" role="tabpanel" hidden>
+    <div class="stack">
+      <section class="card">
+        <h2 data-ico="bars">Траты по месяцам · <span id="stats-year-label"></span></h2>
+        <p class="hint">Приглушённые столбцы — план (лимиты + разовые), золотые — факт. Данные за месяц записываются сами, когда вы ведёте планер.</p>
+        <div class="chart-wrap" id="chart"></div>
+        <p class="small muted" id="chart-stats"></p>
+        <div class="legend small muted">
+          <span><i class="dot dot-plan"></i> план</span>
+          <span><i class="dot dot-spent"></i> потрачено</span>
+          <span><i class="dot dot-avg"></i> средний факт</span>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div>Данные хранятся только в этом браузере (localStorage). Ничего никуда не отправляется.</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button class="btn btn-sm" id="demo-btn">Загрузить пример</button>
+      <button class="btn btn-sm" id="clear-spent">Обнулить «потрачено»</button>
+      <button class="btn btn-sm" id="reset-btn">Очистить всё</button>
+    </div>
+  </footer>
+
+</div>
+
+<script src="lib/budget.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
